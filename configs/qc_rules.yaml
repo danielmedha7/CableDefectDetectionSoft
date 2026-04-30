@@ -1,0 +1,44 @@
+# ─────────────────────────────────────────────
+# CableVision OS — QC Rules
+# Loaded by system_logic/qc_engine.py at startup.
+# Hot-reloadable via POST /api/config/reload
+# ─────────────────────────────────────────────
+
+severity_thresholds:
+  low:      0.0
+  medium:   0.5
+  high:     0.75
+  critical: 0.90
+
+cable_specs:
+
+  default:
+    max_crack_depth_mm:    1.5
+    max_defects_per_100m:  3
+    max_area_mm2:          25.0
+    max_diameter_dev_pct:  2.0
+    min_roundness:         0.95
+    forbidden_classes:     [insulation_gap]
+
+  HV_35mm:
+    max_crack_depth_mm:    0.8
+    max_defects_per_100m:  2
+    max_area_mm2:          12.0
+    max_diameter_dev_pct:  1.5
+    min_roundness:         0.97
+    forbidden_classes:     [insulation_gap, deformation]
+
+  HV_110mm:
+    max_crack_depth_mm:    0.5
+    max_defects_per_100m:  1
+    max_area_mm2:          8.0
+    max_diameter_dev_pct:  1.0
+    min_roundness:         0.98
+    forbidden_classes:     [insulation_gap, deformation, dent]
+
+# ── Verdict logic ──
+verdict:
+  fail_on_forbidden_class: true
+  fail_on_critical_severity: true
+  review_on_high_severity: true
+  review_if_defect_density_above: 0.8  # ratio of spec limit

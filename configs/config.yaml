@@ -1,0 +1,107 @@
+# ─────────────────────────────────────────────
+# CableVision OS — Master Configuration
+# ─────────────────────────────────────────────
+
+system:
+  name: CableVision OS
+  version: "3.0"
+  log_level: INFO            # DEBUG | INFO | WARN | ERROR
+  data_dir: ./data
+  log_dir:  ./logs
+  models_dir: ./models
+
+# ── Cameras (4× IMX219 via Arducam Multi-Camera HAT) ──
+cameras:
+  count: 4
+  sensor_ids: [0, 1, 2, 3]
+  angles_deg: [0, 90, 180, 270]
+  resolution: [1920, 1080]
+  fps: 30
+  fov_deg: 77
+  pixel_pitch_mm: 0.00112
+  focal_length_px: 2714
+  i2c_bus: 6
+  hat_address: 0x24
+
+# ── GPIO sync (Jetson BOARD numbering) ──
+gpio:
+  led_pin:    18
+  laser_pin:  11
+  encoder_a:  29
+  encoder_b:  31
+  pulse_us:   800              # LED/laser strobe duration in µs
+
+# ── Laser triangulation ──
+laser:
+  angle_deg: 30.0
+  hsv_lower: [55, 100, 100]
+  hsv_upper: [85, 255, 255]
+  baseline_path: ./configs/laser_baseline.npy
+  every_nth_frame: 5
+
+# ── Ultrasonic (internal defect detection) ──
+ultrasonic:
+  sample_rate_hz: 1000000      # 1 MHz
+  pulse_freq_hz:  500000       # 500 kHz transducer
+  channels: 4
+  gate_start_us:  10
+  gate_end_us:    120
+  device: /dev/spidev0.0
+
+# ── Encoder (cable position tracking) ──
+encoder:
+  pulses_per_rev: 2000
+  wheel_diameter_mm: 100.0
+  direction: forward            # forward | reverse
+
+# ── AI inference ──
+inference:
+  yolo_engine: ./models/yolov8.engine
+  yolo_conf:   0.45
+  yolo_iou:    0.50
+  yolo_imgsz:  640
+  device:      cuda:0
+  half_precision: true
+  warmup_runs: 5
+  classes:
+    - crack
+    - scratch
+    - dent
+    - insulation_gap
+    - deformation
+    - contamination
+
+  xgboost:
+    classifier: ./models/xgb_classifier.ubj
+    depth:      ./models/xgb_depth.ubj
+    size:       ./models/xgb_size.ubj
+
+# ── Multi-view fusion ──
+fusion:
+  iou_threshold: 0.35
+  dedup_window_deg: 15.0
+  cylindrical_overlap_deg: 13.0
+
+# ── IPC / messaging ──
+ipc:
+  zmq_pub_addr: tcp://127.0.0.1:5556
+  zmq_sub_addr: tcp://127.0.0.1:5556
+  shared_mem_name: laser_depth_profile
+  shared_mem_size: 2560        # 640 floats × 4 bytes
+
+# ── Backend API ──
+api:
+  host: 0.0.0.0
+  port: 8000
+  cors_origins:
+    - http://localhost:3000
+    - http://192.168.1.0/24
+  ws_path: /ws
+  db_url: sqlite:///./data/cablevision.db
+
+# ── Persistence ──
+persistence:
+  store_defect_crops: true
+  crop_dir: ./data/crops
+  retention_days: 90
+  async_queue_size: 256

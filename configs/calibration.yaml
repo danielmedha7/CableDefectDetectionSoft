@@ -1,0 +1,55 @@
+# ─────────────────────────────────────────────
+# CableVision OS — Calibration Data
+# Per-camera intrinsics + laser geometry.
+# Regenerate via training/visual_training/calibrate_cameras.py
+# ─────────────────────────────────────────────
+
+cameras:
+
+  cam0:
+    angle_deg: 0
+    intrinsic_matrix:
+      - [2714.0,    0.0, 960.0]
+      - [   0.0, 2714.0, 540.0]
+      - [   0.0,    0.0,   1.0]
+    distortion: [-0.32, 0.11, 0.0, 0.0, 0.0]
+    extrinsic_offset_mm: [0.0, 0.0, 250.0]
+
+  cam1:
+    angle_deg: 90
+    intrinsic_matrix:
+      - [2714.0,    0.0, 960.0]
+      - [   0.0, 2714.0, 540.0]
+      - [   0.0,    0.0,   1.0]
+    distortion: [-0.31, 0.10, 0.0, 0.0, 0.0]
+    extrinsic_offset_mm: [250.0, 0.0, 0.0]
+
+  cam2:
+    angle_deg: 180
+    intrinsic_matrix:
+      - [2714.0,    0.0, 960.0]
+      - [   0.0, 2714.0, 540.0]
+      - [   0.0,    0.0,   1.0]
+    distortion: [-0.33, 0.12, 0.0, 0.0, 0.0]
+    extrinsic_offset_mm: [0.0, 0.0, -250.0]
+
+  cam3:
+    angle_deg: 270
+    intrinsic_matrix:
+      - [2714.0,    0.0, 960.0]
+      - [   0.0, 2714.0, 540.0]
+      - [   0.0,    0.0,   1.0]
+    distortion: [-0.30, 0.10, 0.0, 0.0, 0.0]
+    extrinsic_offset_mm: [-250.0, 0.0, 0.0]
+
+# ── Laser line plane (in camera-0 reference frame) ──
+laser_plane:
+  origin_mm:  [0.0, 0.0, 200.0]
+  normal:     [0.0, 0.5, -0.866]   # 30° tilt
+  baseline_file: ./configs/laser_baseline.npy
+
+# ── Cable reference geometry ──
+cable_reference:
+  expected_diameter_mm: 35.0
+  surface_radius_mm:    17.5
+  scan_axis_offset_mm:  0.0
