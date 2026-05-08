@@ -1,87 +1,142 @@
-import { useMemo } from 'react';
+// ─────────────────────────────────────────────
+// CableProfile.jsx — defect timeline + severity map per session
+// ─────────────────────────────────────────────
+import React, { useState } from "react";
+import {
+  ScatterChart, Scatter, XAxis, YAxis, ZAxis, CartesianGrid,
+  Tooltip, ResponsiveContainer,
+} from "recharts";
+import { useCableProfile, severityColor, verdictColor } from "./hooks";
 
-function toProfilePoint(item, index) {
-  const position = Number(item.position_mm ?? item.positionMm ?? index);
-  const diameter = Number(item.diameter_mm ?? item.diameterMm ?? 0);
-  const roundness = Number(item.roundness_error_mm ?? item.roundnessMm ?? 0);
-  return {
-    position: Number.isFinite(position) ? position : index,
-    diameter: Number.isFinite(diameter) ? diameter : 0,
-    roundness: Number.isFinite(roundness) ? roundness : 0,
-  };
-}
+const sevToScore = { low: 1, medium: 2, high: 3, critical: 4 };
 
-function buildPath(points, minX, maxX, minY, maxY, width, height) {
-  const spanX = Math.max(maxX - minX, 1e-9);
-  const spanY = Math.max(maxY - minY, 1e-9);
-  return points
-    .map((point, index) => {
-      const x = ((point.position - minX) / spanX) * width;
-      const y = height - ((point.diameter - minY) / spanY) * height;
-      return `${index === 0 ? 'M' : 'L'}${x.toFixed(2)},${y.toFixed(2)}`;
-    })
-    .join(' ');
-}
+export default function CableProfile() {
+  const [sessionId, setSessionId] = useState("");
+  const [submitted, setSubmitted] = useState("");
+  const { data, loading, error } = useCableProfile(submitted);
 
-export default function CableProfile({
-  profilePoints = [],
-  targetDiameterMm = 0,
-  toleranceMm = 0,
-  roundnessLimitMm = 0,
-}) {
-  const points = useMemo(() => profilePoints.map(toProfilePoint), [profilePoints]);
-  const stats = useMemo(() => {
-    if (!points.length) {
-      return null;
-    }
-    const diameters = points.map((point) => point.diameter);
-    const roundnessValues = points.map((point) => point.roundness);
-    return {
-      minDiameter: Math.min(...diameters),
-      maxDiameter: Math.max(...diameters),
-      maxRoundness: Math.max(...roundnessValues),
-      outOfToleranceCount: points.filter(
-        (point) => Math.abs(point.diameter - targetDiameterMm) > toleranceMm,
-      ).length,
-    };
-  }, [points, targetDiameterMm, toleranceMm]);
-
-  if (!points.length) {
-    return (
-      <section className="cable-profile">
-        <h2>Cable Profile</h2>
-        <p>No diameter profile received yet.</p>
-      </section>
-    );
-  }
-
-  const minX = points[0].position;
-  const maxX = points[points.length - 1].position;
-  const minY = Math.min(...points.map((point) => point.diameter), targetDiameterMm - toleranceMm);
-  const maxY = Math.max(...points.map((point) => point.diameter), targetDiameterMm + toleranceMm);
-  const width = 1000;
-  const height = 260;
-  const profilePath = buildPath(points, minX, maxX, minY, maxY, width, height);
+  const points = (data?.defects ?? []).map(d => ({
+    x: d.position_m,
+    y: d.angle_deg,
+    z: sevToScore[d.severity] ?? 1,
+    cls: d.cls,
+    severity: d.severity,
+    depth: d.depth_mm,
+  }));
 
   return (
-    <section className="cable-profile">
-      <header>
-        <h2>Cable Profile</h2>
-        <p>Target {targetDiameterMm.toFixed(3)} mm ± {toleranceMm.toFixed(3)} mm</p>
+    <div className="p-6 text-slate-200 bg-slate-950 min-h-screen">
+      <header className="mb-6">
+        <h1 className="text-2xl font-bold tracking-wide">Cable Profile</h1>
+        <p className="text-slate-400 text-xs">Defect timeline + severity map</p>
       </header>
 
-      <svg viewBox={`0 0 ${width} ${height}`} role="img" aria-label="Diameter profile">
-        <path d={profilePath} fill="none" stroke="currentColor" strokeWidth="2" />
-      </svg>
+      <form
+        onSubmit={(e) => { e.preventDefault(); setSubmitted(sessionId.trim()); }}
+        className="flex gap-2 mb-6"
+      >
+        <input
+          value={sessionId}
+          onChange={(e) => setSessionId(e.target.value)}
+          placeholder="Session ID, e.g. a1b2c3d4e5f6"
+          className="bg-slate-900 border border-slate-700 px-3 py-2 rounded text-sm font-mono w-72"
+        />
+        <button
+          type="submit"
+          className="bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 px-4 py-2 rounded text-sm hover:bg-emerald-500/30"
+        >
+          Load
+        </button>
+      </form>
 
-      <dl className="cable-profile__stats">
-        <div><dt>Min Diameter</dt><dd>{stats.minDiameter.toFixed(3)} mm</dd></div>
-        <div><dt>Max Diameter</dt><dd>{stats.maxDiameter.toFixed(3)} mm</dd></div>
-        <div><dt>Max Roundness Error</dt><dd>{stats.maxRoundness.toFixed(3)} mm</dd></div>
-        <div><dt>Out of Tolerance Points</dt><dd>{stats.outOfToleranceCount}</dd></div>
-        <div><dt>Roundness Limit</dt><dd>{roundnessLimitMm.toFixed(3)} mm</dd></div>
-      </dl>
-    </section>
+      {loading && <p className="text-slate-400 text-sm">Loading…</p>}
+      {error && <p className="text-rose-400 text-sm">Failed to load: {String(error)}</p>}
+
+      {data && (
+        <>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
+            <Stat label="Cable ID"      value={data.cable_id} />
+            <Stat label="Spec"          value={data.cable_spec} />
+            <Stat label="Length"        value={`${data.cable_length_m?.toFixed(2) ?? "—"} m`} />
+            <Stat
+              label="Verdict"
+              value={
+                <span className={`px-2 py-0.5 rounded border ${verdictColor(data.verdict)}`}>
+                  {data.verdict ?? "PENDING"}
+                </span>
+              }
+            />
+          </div>
+
+          <section className="bg-slate-900 border border-slate-800 rounded-md p-4 mb-6">
+            <h2 className="text-xs uppercase tracking-widest text-slate-400 mb-3">
+              Severity map (position × angle)
+            </h2>
+            <div className="h-72">
+              <ResponsiveContainer width="100%" height="100%">
+                <ScatterChart>
+                  <CartesianGrid stroke="#1e293b" strokeDasharray="3 3" />
+                  <XAxis dataKey="x" name="Position (m)" stroke="#64748b" />
+                  <YAxis dataKey="y" name="Angle (°)" domain={[0, 360]} stroke="#64748b" />
+                  <ZAxis dataKey="z" range={[40, 240]} />
+                  <Tooltip
+                    contentStyle={{ background: "#0f172a", border: "1px solid #334155" }}
+                    formatter={(value, name, p) => name === "z"
+                      ? [p.payload.severity, "severity"]
+                      : [value, name]}
+                  />
+                  <Scatter data={points} fill="#10b981" />
+                </ScatterChart>
+              </ResponsiveContainer>
+            </div>
+          </section>
+
+          <section className="rounded-md border border-slate-800 overflow-hidden">
+            <table className="w-full text-xs font-mono">
+              <thead className="bg-slate-900 text-slate-400 uppercase tracking-wider">
+                <tr>
+                  <th className="text-left px-3 py-2">#</th>
+                  <th className="text-left px-3 py-2">Class</th>
+                  <th className="text-left px-3 py-2">Severity</th>
+                  <th className="text-right px-3 py-2">Pos (m)</th>
+                  <th className="text-right px-3 py-2">Angle (°)</th>
+                  <th className="text-right px-3 py-2">Depth (mm)</th>
+                  <th className="text-right px-3 py-2">Conf</th>
+                </tr>
+              </thead>
+              <tbody>
+                {(data.defects ?? []).map((d, i) => (
+                  <tr key={i} className="border-t border-slate-800">
+                    <td className="px-3 py-1.5 text-slate-500">{i + 1}</td>
+                    <td className="px-3 py-1.5">{d.cls}</td>
+                    <td className="px-3 py-1.5">
+                      <span className={`px-1.5 py-0.5 rounded border ${severityColor(d.severity)}`}>
+                        {d.severity}
+                      </span>
+                    </td>
+                    <td className="px-3 py-1.5 text-right">{d.position_m?.toFixed(2)}</td>
+                    <td className="px-3 py-1.5 text-right">{d.angle_deg?.toFixed(1)}</td>
+                    <td className="px-3 py-1.5 text-right">{d.depth_mm?.toFixed(2)}</td>
+                    <td className="px-3 py-1.5 text-right">{d.confidence?.toFixed(2)}</td>
+                  </tr>
+                ))}
+                {(!data.defects || data.defects.length === 0) && (
+                  <tr><td className="px-3 py-3 text-slate-500" colSpan={7}>No defects in this session.</td></tr>
+                )}
+              </tbody>
+            </table>
+          </section>
+        </>
+      )}
+    </div>
   );
 }
 
+function Stat({ label, value }) {
+  return (
+    <div className="bg-slate-900 border border-slate-800 rounded p-3">
+      <div className="text-[10px] uppercase tracking-widest text-slate-500 mb-1">{label}</div>
+      <div className="text-base font-bold">{value}</div>
+    </div>
+  );
+}

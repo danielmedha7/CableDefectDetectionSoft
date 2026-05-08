@@ -1,157 +1,110 @@
-import { useMemo } from 'react';
+// ─────────────────────────────────────────────
+// LiveMonitor.jsx — 4 camera feeds + real-time defect overlay
+// ─────────────────────────────────────────────
+import React, { useMemo } from "react";
+import { useDetections, severityColor } from "./hooks";
 
-function asNumber(value, fallback = 0) {
-  const parsed = Number(value);
-  return Number.isFinite(parsed) ? parsed : fallback;
+const API_BASE = import.meta.env?.VITE_API_BASE ?? "http://localhost:8000";
+
+function CameraTile({ camId, detections }) {
+  const camDets = useMemo(
+    () => detections.filter(d => d.defect?.camera_id === camId).slice(-3),
+    [detections, camId],
+  );
+  return (
+    <div className="relative aspect-video rounded-md overflow-hidden border border-slate-700 bg-slate-900">
+      <img
+        src={`${API_BASE}/api/cameras/${camId}/stream`}
+        alt={`cam ${camId}`}
+        className="w-full h-full object-cover"
+        onError={(e) => { e.currentTarget.style.opacity = 0.2; }}
+      />
+      <div className="absolute top-2 left-2 px-2 py-0.5 rounded bg-black/60 text-emerald-300 text-xs font-mono">
+        CAM {camId}
+      </div>
+      <div className="absolute bottom-2 left-2 right-2 flex gap-1 flex-wrap">
+        {camDets.map((d, i) => (
+          <span
+            key={i}
+            className={`text-[10px] font-mono px-1.5 py-0.5 rounded border ${severityColor(d.defect.severity)}`}
+            title={`${d.defect.cls} @ ${d.defect.position_m?.toFixed(2)}m`}
+          >
+            {d.defect.cls}
+          </span>
+        ))}
+      </div>
+    </div>
+  );
 }
 
-function asString(value, fallback = '-') {
-  return typeof value === 'string' && value.length ? value : fallback;
-}
-
-function formatTime(value) {
-  if (value == null) {
-    return '-';
-  }
-  const parsed = Number(value);
-  if (Number.isFinite(parsed)) {
-    const ts = parsed > 1e12 ? parsed : parsed * 1000;
-    return new Date(ts).toLocaleString();
-  }
-  if (typeof value === 'string') {
-    return value;
-  }
-  return '-';
-}
-
-function getSession(snapshot) {
-  const session = snapshot?.session ?? {};
-  return {
-    id: asString(session.id),
-    cableId: asString(session.cable_id ?? session.cableId),
-    cableSpec: asString(session.cable_spec ?? session.cableSpec),
-    operator: asString(session.operator),
-    startedAt: formatTime(session.started_at ?? session.startedAt),
-    status: asString(session.status ?? session.verdict ?? 'RUNNING'),
-  };
-}
-
-function getPosition(snapshot) {
-  const position = snapshot?.position ?? {};
-  return {
-    positionM: asNumber(position.position_m ?? position.positionM),
-    speedMps: asNumber(position.speed_mps ?? position.speedMps),
-  };
-}
-
-function getMeasurements(snapshot) {
-  const m = snapshot?.measurements ?? {};
-  return {
-    diameterMm: asNumber(m.diameter_mm ?? m.diameterMm),
-    targetDiameterMm: asNumber(m.target_diameter_mm ?? m.targetDiameterMm),
-    roundnessErrorMm: asNumber(m.roundness_error_mm ?? m.roundnessErrorMm),
-    surfaceScore: asNumber(m.surface_score ?? m.surfaceScore),
-    internalRisk: asNumber(m.internal_risk ?? m.internalRisk),
-  };
-}
-
-function getDevices(snapshot) {
-  if (Array.isArray(snapshot?.devices)) {
-    return snapshot.devices;
-  }
-  const devices = snapshot?.devices ?? {};
-  return [
-    { id: 'jetson', ...devices.jetson },
-    { id: 'pi_a', ...devices.pi_a, name: 'Pi A' },
-    { id: 'pi_b', ...devices.pi_b, name: 'Pi B' },
-  ].filter((item) => Object.keys(item).length > 1);
-}
-
-export default function LiveMonitor({
-  snapshot,
-  loading = false,
-  paused = false,
-  error = '',
-  onRefresh = () => {},
-  onTogglePause = () => {},
-}) {
-  const session = useMemo(() => getSession(snapshot), [snapshot]);
-  const position = useMemo(() => getPosition(snapshot), [snapshot]);
-  const measurements = useMemo(() => getMeasurements(snapshot), [snapshot]);
-  const devices = useMemo(() => getDevices(snapshot), [snapshot]);
+export default function LiveMonitor() {
+  const { connected, detections } = useDetections(80);
+  const recent = detections.slice(-12).reverse();
 
   return (
-    <section className="live-monitor">
-      <header className="live-monitor__header">
+    <div className="p-6 text-slate-200 bg-slate-950 min-h-screen">
+      <header className="flex items-center justify-between mb-6">
         <div>
-          <h2>Live Monitor</h2>
-          <p>Session {session.id} · {session.status}</p>
+          <h1 className="text-2xl font-bold tracking-wide">Live Monitor</h1>
+          <p className="text-slate-400 text-xs">Real-time inspection · 4× IMX219</p>
         </div>
-        <div className="live-monitor__controls">
-          <button type="button" onClick={onRefresh} disabled={loading}>Refresh</button>
-          <button type="button" onClick={onTogglePause}>{paused ? 'Resume' : 'Pause'}</button>
-        </div>
+        <span className={`px-3 py-1 rounded text-xs font-mono border ${
+          connected
+            ? "text-emerald-300 border-emerald-500/40 bg-emerald-500/10"
+            : "text-rose-300 border-rose-500/40 bg-rose-500/10"
+        }`}>
+          {connected ? "● LIVE" : "○ OFFLINE"}
+        </span>
       </header>
 
-      {error ? <p className="live-monitor__error">{error}</p> : null}
+      <section className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-6">
+        {[0, 1, 2, 3].map(id => (
+          <CameraTile key={id} camId={id} detections={detections} />
+        ))}
+      </section>
 
-      <div className="live-monitor__grid">
-        <article>
-          <h3>Run</h3>
-          <dl>
-            <div><dt>Cable</dt><dd>{session.cableId}</dd></div>
-            <div><dt>Spec</dt><dd>{session.cableSpec}</dd></div>
-            <div><dt>Operator</dt><dd>{session.operator}</dd></div>
-            <div><dt>Started</dt><dd>{session.startedAt}</dd></div>
-          </dl>
-        </article>
-
-        <article>
-          <h3>Position</h3>
-          <dl>
-            <div><dt>Length</dt><dd>{position.positionM.toFixed(3)} m</dd></div>
-            <div><dt>Speed</dt><dd>{position.speedMps.toFixed(3)} m/s</dd></div>
-          </dl>
-        </article>
-
-        <article>
-          <h3>Measurements</h3>
-          <dl>
-            <div><dt>Diameter</dt><dd>{measurements.diameterMm.toFixed(3)} mm</dd></div>
-            <div><dt>Target</dt><dd>{measurements.targetDiameterMm.toFixed(3)} mm</dd></div>
-            <div><dt>Roundness Error</dt><dd>{measurements.roundnessErrorMm.toFixed(3)} mm</dd></div>
-            <div><dt>Surface Score</dt><dd>{measurements.surfaceScore.toFixed(1)}%</dd></div>
-            <div><dt>Internal Risk</dt><dd>{measurements.internalRisk.toFixed(1)}%</dd></div>
-          </dl>
-        </article>
-      </div>
-
-      <article className="live-monitor__devices">
-        <h3>Device Chain</h3>
-        {devices.length ? (
-          <table>
-            <thead>
+      <section>
+        <h2 className="text-sm font-bold text-slate-300 uppercase tracking-widest mb-3">
+          Recent detections
+        </h2>
+        <div className="rounded-md border border-slate-800 overflow-hidden">
+          <table className="w-full text-xs font-mono">
+            <thead className="bg-slate-900 text-slate-400 uppercase tracking-wider">
               <tr>
-                <th>Device</th>
-                <th>Status</th>
-                <th>Detail</th>
+                <th className="text-left px-3 py-2">Time</th>
+                <th className="text-left px-3 py-2">Class</th>
+                <th className="text-left px-3 py-2">Severity</th>
+                <th className="text-right px-3 py-2">Pos (m)</th>
+                <th className="text-right px-3 py-2">Depth (mm)</th>
+                <th className="text-right px-3 py-2">Conf</th>
+                <th className="text-left px-3 py-2">Verdict</th>
               </tr>
             </thead>
             <tbody>
-              {devices.map((device) => (
-                <tr key={device.id ?? device.name}>
-                  <td>{asString(device.name ?? device.id)}</td>
-                  <td>{asString(device.status, 'unknown')}</td>
-                  <td>{JSON.stringify(device)}</td>
+              {recent.length === 0 && (
+                <tr><td className="px-3 py-3 text-slate-500" colSpan={7}>No detections yet…</td></tr>
+              )}
+              {recent.map((evt, i) => (
+                <tr key={i} className="border-t border-slate-800">
+                  <td className="px-3 py-1.5 text-slate-400">
+                    {new Date((evt.defect?.timestamp ?? Date.now() / 1000) * 1000).toLocaleTimeString()}
+                  </td>
+                  <td className="px-3 py-1.5">{evt.defect?.cls}</td>
+                  <td className="px-3 py-1.5">
+                    <span className={`px-1.5 py-0.5 rounded border ${severityColor(evt.defect?.severity)}`}>
+                      {evt.defect?.severity}
+                    </span>
+                  </td>
+                  <td className="px-3 py-1.5 text-right">{evt.defect?.position_m?.toFixed(2)}</td>
+                  <td className="px-3 py-1.5 text-right">{evt.defect?.depth_mm?.toFixed(2)}</td>
+                  <td className="px-3 py-1.5 text-right">{evt.defect?.confidence?.toFixed(2)}</td>
+                  <td className="px-3 py-1.5">{evt.verdict}</td>
                 </tr>
               ))}
             </tbody>
           </table>
-        ) : (
-          <p>No device telemetry.</p>
-        )}
-      </article>
-    </section>
+        </div>
+      </section>
+    </div>
   );
 }
-

@@ -1,90 +1,97 @@
-import { useMemo } from 'react';
+// ─────────────────────────────────────────────
+// InternalDefectLog.jsx — ultrasonic internal defects
+// ─────────────────────────────────────────────
+import React, { useEffect, useState, useMemo } from "react";
+import { api, useWebSocket, severityColor } from "./hooks";
 
-function normalizeDefect(item, source) {
-  const timestamp = Number(item.timestamp ?? item.ts ?? 0);
-  return {
-    id: String(item.id ?? `${source}-${timestamp}-${item.cls ?? item.type ?? 'defect'}`),
-    source,
-    timestamp: Number.isFinite(timestamp) ? timestamp : 0,
-    cls: String(item.cls ?? item.type ?? 'unknown'),
-    severity: String(item.severity ?? 'low'),
-    confidence: Number(item.confidence ?? item.cls_confidence ?? 0),
-    positionM: Number(item.position_m ?? item.positionM ?? 0),
-    depthMm: Number(item.depth_mm ?? item.depthMm ?? 0),
-    sizeMm: Number(item.size_mm ?? item.sizeMm ?? 0),
-    cameraId: item.camera_id ?? item.cameraId ?? '-',
-    channel: item.channel ?? '-',
-    verdict: item.verdict ?? '-',
-  };
-}
+export default function InternalDefectLog() {
+  const [items, setItems] = useState([]);
+  const [filter, setFilter] = useState("all");
+  const [loading, setLoading] = useState(true);
+  const { lastEvent } = useWebSocket();
 
-function formatTime(value) {
-  if (!value) {
-    return '-';
-  }
-  const ts = value > 1e12 ? value : value * 1000;
-  return new Date(ts).toLocaleString();
-}
+  useEffect(() => {
+    let alive = true;
+    api.get("/api/defects/internal?limit=200")
+      .then(r => { if (alive) setItems(r.data ?? []); })
+      .catch(() => {})
+      .finally(() => { if (alive) setLoading(false); });
+    return () => { alive = false; };
+  }, []);
 
-export default function InternalDefectLog({
-  surfaceDefects = [],
-  internalDefects = [],
-  maxRows = 200,
-}) {
-  const rows = useMemo(() => {
-    const surface = surfaceDefects.map((item) => normalizeDefect(item, 'surface'));
-    const internal = internalDefects.map((item) => normalizeDefect(item, 'internal'));
-    return [...surface, ...internal]
-      .sort((a, b) => b.timestamp - a.timestamp)
-      .slice(0, maxRows);
-  }, [surfaceDefects, internalDefects, maxRows]);
+  useEffect(() => {
+    if (lastEvent?.type !== "internal_defect") return;
+    setItems(prev => [lastEvent.payload, ...prev].slice(0, 500));
+  }, [lastEvent]);
+
+  const filtered = useMemo(() => {
+    if (filter === "all") return items;
+    return items.filter(d => d.cls === filter);
+  }, [items, filter]);
+
+  const classes = useMemo(
+    () => Array.from(new Set(items.map(d => d.cls))).sort(),
+    [items],
+  );
 
   return (
-    <section className="internal-defect-log">
-      <header>
-        <h2>Defect Log</h2>
-        <p>{rows.length} recent rows</p>
+    <div className="p-6 text-slate-200 bg-slate-950 min-h-screen">
+      <header className="mb-6 flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold tracking-wide">Internal Defect Log</h1>
+          <p className="text-slate-400 text-xs">Ultrasonic A-scan classifications · XGBoost</p>
+        </div>
+        <select
+          value={filter}
+          onChange={(e) => setFilter(e.target.value)}
+          className="bg-slate-900 border border-slate-700 rounded px-3 py-1.5 text-sm font-mono"
+        >
+          <option value="all">all classes</option>
+          {classes.map(c => <option key={c} value={c}>{c}</option>)}
+        </select>
       </header>
 
-      {rows.length ? (
-        <table>
-          <thead>
+      {loading && <p className="text-slate-400 text-sm">Loading…</p>}
+
+      <div className="rounded-md border border-slate-800 overflow-hidden">
+        <table className="w-full text-xs font-mono">
+          <thead className="bg-slate-900 text-slate-400 uppercase tracking-wider">
             <tr>
-              <th>Time</th>
-              <th>Source</th>
-              <th>Class</th>
-              <th>Severity</th>
-              <th>Position (m)</th>
-              <th>Depth (mm)</th>
-              <th>Size (mm)</th>
-              <th>Confidence</th>
-              <th>Camera</th>
-              <th>Channel</th>
-              <th>Verdict</th>
+              <th className="text-left px-3 py-2">Time</th>
+              <th className="text-left px-3 py-2">Class</th>
+              <th className="text-left px-3 py-2">Severity</th>
+              <th className="text-right px-3 py-2">Conf</th>
+              <th className="text-right px-3 py-2">Depth (mm)</th>
+              <th className="text-right px-3 py-2">Size (mm)</th>
+              <th className="text-right px-3 py-2">Pos (m)</th>
+              <th className="text-right px-3 py-2">Channel</th>
             </tr>
           </thead>
           <tbody>
-            {rows.map((row) => (
-              <tr key={row.id}>
-                <td>{formatTime(row.timestamp)}</td>
-                <td>{row.source}</td>
-                <td>{row.cls}</td>
-                <td>{row.severity}</td>
-                <td>{row.positionM.toFixed(3)}</td>
-                <td>{row.depthMm.toFixed(3)}</td>
-                <td>{row.sizeMm.toFixed(3)}</td>
-                <td>{row.confidence.toFixed(3)}</td>
-                <td>{row.cameraId}</td>
-                <td>{row.channel}</td>
-                <td>{row.verdict}</td>
+            {filtered.map((d, i) => (
+              <tr key={i} className="border-t border-slate-800">
+                <td className="px-3 py-1.5 text-slate-400">
+                  {new Date((d.timestamp ?? Date.now() / 1000) * 1000).toLocaleTimeString()}
+                </td>
+                <td className="px-3 py-1.5">{d.cls}</td>
+                <td className="px-3 py-1.5">
+                  <span className={`px-1.5 py-0.5 rounded border ${severityColor(d.severity)}`}>
+                    {d.severity ?? "—"}
+                  </span>
+                </td>
+                <td className="px-3 py-1.5 text-right">{d.confidence?.toFixed(2)}</td>
+                <td className="px-3 py-1.5 text-right">{d.depth_mm?.toFixed(2)}</td>
+                <td className="px-3 py-1.5 text-right">{d.size_mm?.toFixed(2)}</td>
+                <td className="px-3 py-1.5 text-right">{d.position_m?.toFixed(2)}</td>
+                <td className="px-3 py-1.5 text-right">{d.channel}</td>
               </tr>
             ))}
+            {filtered.length === 0 && !loading && (
+              <tr><td colSpan={8} className="px-3 py-3 text-slate-500">No internal defects logged.</td></tr>
+            )}
           </tbody>
         </table>
-      ) : (
-        <p>No defects logged.</p>
-      )}
-    </section>
+      </div>
+    </div>
   );
 }
-
