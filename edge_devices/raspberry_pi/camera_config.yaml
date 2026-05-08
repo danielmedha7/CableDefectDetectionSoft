@@ -1,0 +1,47 @@
+device:
+  # pi_a should publish CAM-1/CAM-2 and pi_b should publish CAM-3/CAM-4.
+  node_id: pi_a
+
+streaming:
+  # Jetson ingest endpoint for camera frames.
+  jetson_frame_endpoint: "http://192.168.1.10:8000/ingest/frame"
+  send_enabled: true
+  request_timeout_s: 1.0
+  headers: {}
+
+capture_defaults:
+  width: 1280
+  height: 720
+  fps: 30
+  jpeg_quality: 85
+
+debug:
+  # Keep save_debug_frames true during alignment and turn it off in production.
+  save_debug_frames: true
+  debug_dir: "debug_frames"
+  debug_every_n_frames: 60
+  preview_enabled: false
+
+cameras:
+  - id: "CAM-1"
+    name: "Upper left"
+    enabled: true
+    source_type: "picamera2"
+    source: 0
+    # Optional camera overrides:
+    # width: 1280
+    # height: 720
+    # fps: 30
+    # jpeg_quality: 85
+    controls:
+      exposure_us:
+      gain:
+
+  - id: "CAM-2"
+    name: "Upper right"
+    enabled: true
+    source_type: "picamera2"
+    source: 1
+    controls:
+      exposure_us:
+      gain:
