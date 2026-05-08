@@ -1,0 +1,113 @@
+{
+  "id": "47f01819a54f",
+  "cable_id": "C-DRYRUN-01",
+  "cable_spec": "HV_35mm",
+  "operator": "diagnostic",
+  "started_at": 1778258907.4388378,
+  "ended_at": 1778258907.4394968,
+  "verdict": "FAIL",
+  "verdict_reasons": [
+    "density 50.00/100m near limit 2",
+    "density 100.00/100m near limit 2",
+    "forbidden class: insulation_gap",
+    "defect density 200.01/100m exceeds 2/100m"
+  ],
+  "cable_length_m": 1.9999378832752623,
+  "defects": [
+    {
+      "cls": "crack",
+      "confidence": 0.92,
+      "angle_deg": 359.5989583333333,
+      "position_m": 1.9999378832752623,
+      "bbox": [
+        900,
+        400,
+        1000,
+        500
+      ],
+      "camera_id": 0,
+      "depth_mm": 0.0,
+      "area_mm2": 0.0,
+      "severity": "low",
+      "timestamp": 1778258907.438949,
+      "session_id": "47f01819a54f",
+      "extra": {
+        "severity_score": 0.4705,
+        "severity_reasons": [
+          "high-impact class:crack",
+          "high confidence 0.92"
+        ]
+      }
+    },
+    {
+      "cls": "scratch",
+      "confidence": 0.55,
+      "angle_deg": 85.58854166666667,
+      "position_m": 1.9999378832752623,
+      "bbox": [
+        800,
+        300,
+        900,
+        400
+      ],
+      "camera_id": 1,
+      "depth_mm": 0.0,
+      "area_mm2": 0.0,
+      "severity": "low",
+      "timestamp": 1778258907.4389532,
+      "session_id": "47f01819a54f",
+      "extra": {
+        "severity_score": 0.1875,
+        "severity_reasons": []
+      }
+    },
+    {
+      "cls": "insulation_gap",
+      "confidence": 0.88,
+      "angle_deg": 181.60416666666666,
+      "position_m": 1.9999378832752623,
+      "bbox": [
+        950,
+        450,
+        1050,
+        550
+      ],
+      "camera_id": 2,
+      "depth_mm": 0.0,
+      "area_mm2": 0.0,
+      "severity": "low",
+      "timestamp": 1778258907.4389546,
+      "session_id": "47f01819a54f",
+      "extra": {
+        "severity_score": 0.482,
+        "severity_reasons": [
+          "high-impact class:insulation_gap",
+          "high confidence 0.88"
+        ]
+      }
+    },
+    {
+      "cls": "dent",
+      "confidence": 0.71,
+      "angle_deg": 261.578125,
+      "position_m": 1.9999378832752623,
+      "bbox": [
+        700,
+        200,
+        800,
+        300
+      ],
+      "camera_id": 3,
+      "depth_mm": 0.0,
+      "area_mm2": 0.0,
+      "severity": "low",
+      "timestamp": 1778258907.4389555,
+      "session_id": "47f01819a54f",
+      "extra": {
+        "severity_score": 0.299,
+        "severity_reasons": []
+      }
+    }
+  ],
+  "notes": ""
+}

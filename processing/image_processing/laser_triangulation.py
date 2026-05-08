@@ -27,9 +27,10 @@ except ImportError:  # pragma: no cover
 
 @dataclass
 class TriangulationConfig:
-    theta_deg: float = 30.0           # laser angle to surface
-    focal_px: float = 2714.0          # IMX219 focal in pixels
-    pixel_pitch_mm: float = 0.00112   # pixel pitch
+    theta_deg: float = 30.0             # laser angle to surface
+    focal_px: float = 2714.0            # IMX219 focal in pixels
+    pixel_pitch_mm: float = 0.00112     # pixel pitch (currently unused — kept for completeness)
+    working_distance_mm: float = 250.0  # camera-to-cable nominal distance — REQUIRED for correct depth
     hsv_lower: tuple[int, int, int] = (55, 100, 100)
     hsv_upper: tuple[int, int, int] = (85, 255, 255)
 
@@ -95,7 +96,16 @@ class LaserTriangulator:
         return centroids
 
     def triangulate(self, centroids: np.ndarray) -> np.ndarray:
-        """Convert centroid array → depth_mm[W]."""
+        """Convert per-column centroid array → depth_mm[W].
+
+        Standard structured-light geometry. For a stripe at angle θ to the
+        surface, a depth offset δ from the reference plane projects onto a
+        pixel shift Δx_px ≈ f · δ · tan(θ) / Z₀, so:
+
+            δ_mm = Δx_px · Z₀ / (f_px · tan(θ))
+
+        where Z₀ is the camera-to-cable working distance.
+        """
         if self.baseline is None or self.baseline.size != centroids.size:
             base = np.nanmedian(centroids) if np.any(np.isfinite(centroids)) else 0.0
             baseline = np.full_like(centroids, base, dtype=np.float32)
@@ -103,7 +113,10 @@ class LaserTriangulator:
             baseline = self.baseline
 
         delta_px = baseline - centroids
-        depth_mm = (delta_px * self.config.pixel_pitch_mm) / (self.config.focal_px * self._tan_theta * 1e-3)
+        denom = self.config.focal_px * self._tan_theta
+        if denom <= 0:
+            return np.zeros_like(delta_px, dtype=np.float32)
+        depth_mm = (delta_px * self.config.working_distance_mm) / denom
         depth_mm = np.where(np.isfinite(depth_mm), depth_mm, 0.0).astype(np.float32)
         return depth_mm
 

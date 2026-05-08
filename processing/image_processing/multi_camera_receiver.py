@@ -121,22 +121,32 @@ class MultiCameraReceiver:
 
     # ── capture cycle ──
     def grab_bundle(self, laser_frame: bool = False) -> FrameBundle | None:
+        """Strobe (briefly) then read each camera.
+
+        We pulse the LED + laser for <1 ms once per cycle (motion-freeze flash).
+        The cameras are free-running at 30 fps; the flash hits within their
+        exposure window. Holding the LED on through the whole multi-cam read
+        would burn power and overheat the LED — and was a bug in the prior
+        implementation.
+        """
         try:
             self._gpio.output(self.led_pin, self._gpio.HIGH)
             if laser_frame:
                 self._gpio.output(self.laser_pin, self._gpio.HIGH)
-
-            ts = time.time()
-            frames: dict[int, np.ndarray] = {}
-            for cam_id, cap in enumerate(self._caps):
-                ok, frm = cap.read() if cap is not None else (False, None)
-                if ok and frm is not None:
-                    frames[cam_id] = frm
-                else:
-                    log.debug("camera %d returned no frame", cam_id)
+            time.sleep(800e-6)              # 800 µs strobe per architecture spec
         finally:
             self._gpio.output(self.led_pin,   self._gpio.LOW)
-            self._gpio.output(self.laser_pin, self._gpio.LOW)
+            if laser_frame:
+                self._gpio.output(self.laser_pin, self._gpio.LOW)
+
+        ts = time.time()
+        frames: dict[int, np.ndarray] = {}
+        for cam_id, cap in enumerate(self._caps):
+            ok, frm = cap.read() if cap is not None else (False, None)
+            if ok and frm is not None:
+                frames[cam_id] = frm
+            else:
+                log.debug("camera %d returned no frame", cam_id)
 
         if not frames:
             return None

@@ -29,6 +29,7 @@ class WorldDefect:
     area_mm2: float = 0.0
     severity: str = "low"
     timestamp: float = 0.0
+    session_id: str | None = None      # injected by the pipeline before dispatch
     extra: dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:

@@ -53,10 +53,11 @@ class DiameterEstimator:
         self.work_dist = working_distance_mm
         self.pixel_pitch = pixel_pitch_mm
         self.max_dev_clamp = max_dev_pct_clamp
-        # mm per pixel at the cable plane
-        self.mm_per_pixel = (working_distance_mm * pixel_pitch_mm) / (focal_length_px * pixel_pitch_mm) \
-            if focal_length_px > 0 else 1.0
-        self.mm_per_pixel = working_distance_mm / focal_length_px  # equivalent simple ratio
+        # mm-per-pixel at the cable plane: thin-lens scaling of pixel pitch.
+        # mm/px = (Z * pixel_pitch) / (f * pixel_pitch) = Z / f  (pixel_pitch cancels)
+        self.mm_per_pixel = (
+            working_distance_mm / focal_length_px if focal_length_px > 0 else 1.0
+        )
         self._history: Deque[float] = deque(maxlen=smoothing_window)
 
     # ── vision-based ──

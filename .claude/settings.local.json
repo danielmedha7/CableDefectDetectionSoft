@@ -1,0 +1,21 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git checkout *)",
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)",
+      "Bash(git push *)",
+      "Bash(gh pr create --title 'Wire dashboard to live backend + add tests and testing guide' --body ' *)",
+      "Bash(\"C:/Program Files/GitHub CLI/gh.exe\" --version)",
+      "Bash(gh.exe --version)",
+      "Bash(python -c \"import sys; print\\(sys.version\\)\")",
+      "Bash(python -c ' *)",
+      "Bash(pip install *)",
+      "Bash(pip show *)",
+      "Bash(rm -rf data)",
+      "Bash(PYTHONIOENCODING=utf-8 python -m uvicorn backend_api.main:app --host 127.0.0.1 --port 8123 --log-level warning)",
+      "Bash(PYTHONIOENCODING=utf-8 python -m uvicorn backend_api.main:app --host 127.0.0.1 --port 8124 --log-level warning)",
+      "Bash(taskkill //F //IM python.exe)"
+    ]
+  }
+}
